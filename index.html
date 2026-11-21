@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Muse AI 生日歌再创作面试作业，第二阶段静态界面预览。">
+  <title>Muse AI · 生日歌再创作</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m14 5-7 7 7 7"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m5 9 7 7 7-7"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path class="filled" d="m8 5 11 7-11 7Z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path class="filled" d="M6 5h4v14H6zM14 5h4v14h-4z"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m14 5 5 5M4 20l5-1L20 8a2 2 0 0 0-5-5L4 14Z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+    <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 17V5l11-2v12M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2.5"/><ellipse cx="17" cy="16" rx="3" ry="2.5"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="m14 3 8 7-8 7v-5C8 12 5 14 2 19c1-10 6-12 12-12Z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 7h15l-3-3M20 17H5l3 3M19 7l-3 3M5 17l3-3"/></symbol>
+    <symbol id="i-restart" viewBox="0 0 24 24"><path d="M20 9a8 8 0 1 0 0 7M20 3v6h-6"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20S2 14 2 7a5 5 0 0 1 10-1A5 5 0 0 1 22 7c0 7-10 13-10 13Z"/></symbol>
+    <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M7 10h6M10 7v6"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24"><path d="M3 18v3M8 13v8M13 8v13M18 3v18"/></symbol>
+    <symbol id="i-battery" viewBox="0 0 28 24"><rect x="2" y="6" width="21" height="12" rx="3"/><path d="M26 10v4M5 9h15v6H5"/></symbol>
+  </svg>
+
+  <main class="workbench">
+    <aside class="preview-navigation" aria-label="演示页面导航">
+      <a class="brand" href="index.html"><span class="brand-mark">m</span><span>Muse AI</span></a>
+      <h1>生日歌再创作</h1>
+      <p class="workbench-description">从获得评价，到再创作一次。</p>
+      <nav class="page-navigation">
+        <button class="nav-item active" data-page="detail"><span class="step-number">1</span><span>歌曲详情<small>故事的起点</small></span></button>
+        <button class="nav-item" data-page="feedback"><span class="step-number">2</span><span>评分与建议<small>找到修改方向</small></span></button>
+        <button class="nav-item" data-page="generating"><span class="step-number">3</span><span>正在生成<small>过程状态</small></span></button>
+        <button class="nav-item" data-page="result"><span class="step-number">4</span><span>创作完成<small>两首新的作品</small></span></button>
+      </nav>
+      <div class="preview-tools">
+        <span class="tools-title">弹窗预览</span>
+        <button data-preview-edit="global">全局建议编辑 <svg aria-hidden="true"><use href="#i-edit"/></svg></button>
+        <button data-preview-edit="local">局部建议编辑 <svg aria-hidden="true"><use href="#i-edit"/></svg></button>
+      </div>
+      <p class="stage-label"><span></span> 第二阶段 · 静态界面</p>
+    </aside>
+
+    <div class="device-column">
+      <div class="device" aria-label="Muse AI App 界面预览">
+        <div class="device-screen" id="app-screen">
+          <div class="status-bar"><span>11:01</span><span class="status-icons"><span>5G</span><svg><use href="#i-signal"/></svg><svg class="battery"><use href="#i-battery"/></svg></span></div>
+          <div id="page" class="page"></div>
+          <div class="home-indicator" aria-hidden="true"></div>
+          <div id="modal-host"></div>
+        </div>
+      </div>
+      <span class="device-caption">电脑网页演示 · App 界面</span>
+    </div>
+
+    <aside class="page-explanation" aria-live="polite">
+      <h2 id="explanation-title">从一首生日歌开始</h2>
+      <p id="explanation-copy">第一版已经生成。用户想为朋友送上专属祝福，却还不知道该怎么改。</p>
+      <div class="explanation-rule"></div>
+      <h3>当前可预览</h3>
+      <p>切换页面、打开文字弹窗，以及查看局部片段的选中样式。</p>
+      <p class="preview-boundary">评分、建议和生成结果均为演示资料。音频播放、时间轴拖动及完整编辑操作将在后续阶段接入。</p>
+      <p class="preview-notice" id="preview-notice" role="status"></p>
+    </aside>
+  </main>
+</body>
+</html>
