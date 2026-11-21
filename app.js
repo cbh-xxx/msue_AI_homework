@@ -10,7 +10,7 @@ const initialSuggestions = [
 const pageInfo = {
   detail: ['从一首生日歌开始', '第一版已经生成。用户想为朋友送上专属祝福，却还不知道该怎么改。'],
   feedback: ['让建议成为下一步', '全局与局部分开展示。点击局部卡片可预览对应范围；选中查看与勾选采纳是两种状态。'],
-  generating: ['一次再创作', '沿用创作中的状态语言。等待画面与完成画面可通过左侧导航分别查看。'],
+  generating: ['一次再创作', '沿用 Muse AI 的创作等待界面。进入后等待五秒，自动展示两首新作品；切换到其他页面会取消等待。'],
   result: ['两首新的作品', '参照 Muse AI 的创作完成页呈现两首结果；不增加原版对比或修改要求回看入口。'],
 };
 const pageHost = document.getElementById('page');
@@ -19,6 +19,7 @@ const modalHost = document.getElementById('modal-host');
 let currentPage = 'detail';
 let selectedLocal = null;
 let modalReturnFocus = null;
+let generationTimer = null;
 
 function time(seconds) {
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
@@ -64,21 +65,27 @@ function suggestionCard(item) {
 }
 function feedbackPage() {
   return `${header('评分与建议')}
-    <section class="feedback-top"><div class="song-context"><img src="assets/birthday-original.jpg" alt="歌曲封面"><div><h3>波恢生日快乐</h3><p>轻快流行 / 原声吉他</p></div><div class="match-score"><strong>76</strong><span>/ 100</span></div></div><p class="score-caption">总体匹配分</p><div id="timeline">${waveform(null)}</div></section>
+    <section class="feedback-top"><div class="song-context"><img src="assets/birthday-original.jpg" alt="歌曲封面"><div><h3>波恢生日快乐</h3><p>轻快流行 / 原声吉他</p></div><div class="match-score"><strong>76</strong><span>分</span></div></div><div id="timeline">${waveform(null)}</div></section>
     <div class="suggestions-scroll"><section><div class="section-header"><h3>全局建议</h3><button data-stage-only>${icon('plus')}新增</button></div>${initialSuggestions.filter(x => x.type === 'global').map(suggestionCard).join('')}</section>
     <section class="local-section"><div class="section-header"><h3>局部建议</h3><button data-stage-only>${icon('plus')}新增</button></div>${initialSuggestions.filter(x => x.type === 'local').map(suggestionCard).join('')}</section></div>
     <footer class="feedback-footer"><button class="primary-button" id="regenerate" disabled data-page="generating">重新生成</button></footer>`;
 }
 function generatingPage() {
-  return `${header('音乐创作', 'feedback')}<section class="generation-content"><div class="generation-art"><img src="assets/birthday-original.jpg" alt="正在再创作的生日歌封面"></div><h3>正在创作你的音乐</h3><p>让新的灵感，成为下一首歌。</p><div class="generation-steps" aria-label="生成中"><span></span><span></span><span></span></div><p class="generation-hint">创作需要一点时间，请稍候</p></section>`;
+  return `<header class="app-header"><button class="icon-button" data-page="feedback" aria-label="退出生成等待">${icon('close')}</button><h2>音乐创作</h2><span class="header-spacer"></span></header>
+    <div class="result-scroll"><section class="generation-panel" role="status"><h3>创作中..</h3><p>稍等片刻，等待几秒即可试听</p></section>${resultExtras()}</div>`;
+}
+function resultExtras() {
+  return `<div class="result-actions"><button data-stage-only>${icon('restart')}再次编辑</button><button data-stage-only>${icon('music')}创作新歌</button></div>
+    <h3 class="inspiration-title">灵感参考</h3><div class="inspiration-grid"><article><img src="assets/inspiration-train.jpg" alt="红色列车主题音乐封面"><h4>火车（司风第一版）</h4><p class="inspiration-author">我是金条哥哥<span>${icon('heart')}3</span></p></article><article><img src="assets/inspiration-song.jpg" alt="草帽主题音乐封面"><h4>给昭昭的一首歌</h4><p class="inspiration-author">浪屿夜曲拾音者<span>${icon('heart')}1</span></p></article></div>`;
 }
 function resultPage() {
   return `${header('音乐创作')}
     <div class="result-scroll"><section class="result-complete"><h3>音乐创作完成!</h3><div class="result-songs">${['a','b'].map((version) => `<button class="result-song" data-audio-preview aria-label="播放第${version === 'a' ? '一' : '二'}首新歌曲"><span class="record-cover"><img src="assets/birthday-${version}.jpg" alt="生日歌${version === 'a' ? '一' : '二'}封面"></span><strong>波恢生日快乐</strong></button>`).join('')}</div></section>
-    <div class="result-actions"><button data-stage-only>${icon('restart')}再次编辑</button><button data-stage-only>${icon('music')}创作新歌</button></div>
-    <h3 class="inspiration-title">灵感参考</h3><div class="inspiration-grid"><article><img src="assets/inspiration-train.jpg" alt="红色列车主题音乐封面"><h4>火车（司风第一版）</h4><p class="inspiration-author">我是金条哥哥<span>${icon('heart')}3</span></p></article><article><img src="assets/inspiration-song.jpg" alt="草帽主题音乐封面"><h4>给昭昭的一首歌</h4><p class="inspiration-author">浪屿夜曲拾音者<span>${icon('heart')}1</span></p></article></div></div>`;
+    ${resultExtras()}</div>`;
 }
 function render(page) {
+  clearTimeout(generationTimer);
+  generationTimer = null;
   currentPage = Object.hasOwn(pageInfo, page) ? page : 'detail';
   selectedLocal = null;
   modalHost.replaceChildren();
@@ -93,6 +100,9 @@ function render(page) {
   document.getElementById('explanation-title').textContent = title;
   document.getElementById('explanation-copy').textContent = copy;
   previewNotice('');
+  if (currentPage === 'generating') {
+    generationTimer = setTimeout(() => render('result'), 5000);
+  }
 }
 function openEditor(item) {
   modalReturnFocus = document.activeElement;
