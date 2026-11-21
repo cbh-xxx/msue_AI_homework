@@ -1,4 +1,4 @@
-/* 第二阶段：页面及状态预览。音频、拖动、CRUD 和生成逻辑留待后续阶段。 */
+/* 第三阶段：建议编辑与时间轴交互，真实音频留至第四阶段。 */
 const icon = (name, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const initialSuggestions = [
   { id: 'g1', type: 'global', text: '整体偏舒缓，建议加快节奏，营造轻快氛围。' },
@@ -9,19 +9,33 @@ const initialSuggestions = [
 ];
 const pageInfo = {
   detail: ['从一首生日歌开始', '第一版已经生成。用户想为朋友送上专属祝福，却还不知道该怎么改。'],
-  feedback: ['让建议成为下一步', '全局与局部分开展示。点击局部卡片可预览对应范围；选中查看与勾选采纳是两种状态。'],
+  feedback: ['让建议成为下一步', '建议可自由增删和改写。选中局部卡片即可模拟片段播放，拖动两端调整范围；是否采纳由独立的复选框决定。'],
   generating: ['一次再创作', '沿用 Muse AI 的创作等待界面。进入后等待五秒，自动展示两首新作品；切换到其他页面会取消等待。'],
   result: ['两首新的作品', '参照 Muse AI 的创作完成页呈现两首结果；不增加原版对比或修改要求回看入口。'],
 };
 const pageHost = document.getElementById('page');
 const screen = document.getElementById('app-screen');
 const modalHost = document.getElementById('modal-host');
+const suggestions = initialSuggestions.map(item => ({ ...item, checked: false }));
+const timelineState = { current: 0, viewStart: 0, viewSpan: 221 };
+const songDuration = 221;
 let currentPage = 'detail';
 let selectedLocal = null;
-let modalReturnFocus = null;
+let editing = null;
+let editorHistoryPending = false;
 let generationTimer = null;
+let timeline = null;
+let nextId = 1;
+// 第四阶段可消费此快照；当前固定结果不会按这些指令实际生成音乐。
+let lastGenerationRequest = [];
+
+const findSuggestion = id => suggestions.find(item => item.id === id);
+const selectedSuggestion = () => findSuggestion(selectedLocal) ?? null;
+const checkedSuggestions = () => suggestions.filter(item => item.checked && item.text.trim());
+const escapeHTML = text => String(text).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
 function time(seconds) {
+  seconds = Math.floor(seconds);
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
 function header(title, target = 'detail') {
@@ -44,31 +58,24 @@ function detailPage() {
     <p class="ai-disclaimer">内容由 Muse AI 生成</p>
   </footer>`;
 }
-function waveform(suggestion) {
-  const bars = Array.from({ length: 78 }, (_, i) => {
-    const height = 15 + ((i * 19 + (i % 7) * 11) % 39);
-    return `<rect class="bar" x="${5 + i * 4}" y="${(66 - height) / 2}" width="1.7" height="${height}"/>`;
-  }).join('');
-  const left = suggestion ? 26 : 0;
-  const right = suggestion ? 247 : 0;
-  const range = suggestion ? `<rect class="range-frame" x="${left}" y="4" width="${right - left}" height="58" rx="7"/><rect class="handle" x="${left}" y="4" width="11" height="58" rx="5"/><rect class="handle" x="${right - 11}" y="4" width="11" height="58" rx="5"/><path class="handle-notch" d="M${left + 5.5} 28v11M${right - 5.5} 28v11"/>` : '';
-  const cursor = suggestion ? left + 12 : 5;
-  return `<div class="waveform-wrap"><svg class="waveform" viewBox="0 0 320 66" role="img" aria-label="${suggestion ? '选中建议的波形与范围，当前为静态示意' : '歌曲波形，尚未选中局部建议'}">${bars}${range}<path class="playhead" d="M${cursor} 1v64"/><path class="playhead-head" d="M${cursor - 3} 0h6v6l-3 3-3-3Z"/></svg></div>
-    <div class="timeline-control"><button data-audio-preview aria-label="播放片段">${icon('play')}</button><div class="time-values" aria-label="范围起点、游标时间、范围终点"><span title="范围起点">${suggestion ? time(suggestion.start) : '--:--'}</span><i>|</i><span title="游标时间">${suggestion ? time(suggestion.start) : '00:00'}</span><i>|</i><span title="范围终点">${suggestion ? time(suggestion.end) : '--:--'}</span></div><button class="zoom-button" data-stage-only aria-label="放大时间轴">${icon('zoom')}</button></div>`;
-}
 function suggestionCard(item) {
   return `<article class="suggestion-card ${item.type === 'local' ? 'local' : ''} ${selectedLocal === item.id ? 'is-selected' : ''}" ${item.type === 'local' ? `data-segment="${item.id}" tabindex="0" aria-label="查看片段 ${time(item.start)} 至 ${time(item.end)}"` : ''}>
-    ${item.type === 'local' ? `<span class="segment-time">${icon('play')}${time(item.start)}–${time(item.end)}</span>` : ''}
-    <p class="suggestion-text">${item.text}</p>
-    <div class="suggestion-actions"><button class="icon-button" data-edit="${item.id}" aria-label="修改建议">${icon('edit')}</button><label class="check-control"><input type="checkbox" data-check="${item.id}" aria-label="采纳这条建议">${icon('check')}</label><button class="icon-button" data-stage-only aria-label="删除建议">${icon('trash')}</button></div>
+    ${item.type === 'local' ? `<span class="segment-time">${icon('play')}<span>${time(item.start)}–${time(item.end)}</span></span>` : ''}
+    <p class="suggestion-text">${escapeHTML(item.text)}</p>
+    <div class="suggestion-actions"><button class="icon-button" data-edit="${item.id}" aria-label="修改建议">${icon('edit')}</button><label class="check-control"><input type="checkbox" data-check="${item.id}" aria-label="采纳这条建议" ${item.checked ? 'checked' : ''} ${item.text.trim() ? '' : 'disabled'}>${icon('check')}</label><button class="icon-button" data-delete="${item.id}" aria-label="删除建议">${icon('trash')}</button></div>
   </article>`;
+}
+function suggestionSections() {
+  return ['global', 'local'].map(type => {
+    const items = suggestions.filter(item => item.type === type);
+    return `<section class="${type === 'local' ? 'local-section' : ''}"><div class="section-header"><h3>${type === 'local' ? '局部建议' : '全局建议'}</h3><button data-add="${type}">${icon('plus')}新增</button></div>${items.length ? items.map(suggestionCard).join('') : '<p class="empty-suggestions">暂无建议</p>'}</section>`;
+  }).join('');
 }
 function feedbackPage() {
   return `${header('评分与建议')}
-    <section class="feedback-top"><div class="song-context"><img src="assets/birthday-original.jpg" alt="歌曲封面"><div><h3>波恢生日快乐</h3><p>轻快流行 / 原声吉他</p></div><div class="match-score"><strong>76</strong><span>分</span></div></div><div id="timeline">${waveform(null)}</div></section>
-    <div class="suggestions-scroll"><section><div class="section-header"><h3>全局建议</h3><button data-stage-only>${icon('plus')}新增</button></div>${initialSuggestions.filter(x => x.type === 'global').map(suggestionCard).join('')}</section>
-    <section class="local-section"><div class="section-header"><h3>局部建议</h3><button data-stage-only>${icon('plus')}新增</button></div>${initialSuggestions.filter(x => x.type === 'local').map(suggestionCard).join('')}</section></div>
-    <footer class="feedback-footer"><button class="primary-button" id="regenerate" disabled data-page="generating">重新生成</button></footer>`;
+    <section class="feedback-top"><div class="song-context"><img src="assets/birthday-original.jpg" alt="歌曲封面"><div><h3>波恢生日快乐</h3><p>轻快流行 / 原声吉他</p></div><div class="match-score"><strong>76</strong><span>分</span></div></div><div id="timeline"></div></section>
+    <div class="suggestions-scroll">${suggestionSections()}</div>
+    <footer class="feedback-footer"><button class="primary-button" id="regenerate" ${checkedSuggestions().length ? '' : 'disabled'}>重新生成</button></footer>`;
 }
 function generatingPage() {
   return `<header class="app-header"><button class="icon-button" data-page="feedback" aria-label="退出生成等待">${icon('close')}</button><h2>音乐创作</h2><span class="header-spacer"></span></header>
@@ -84,10 +91,11 @@ function resultPage() {
     ${resultExtras()}</div>`;
 }
 function render(page) {
+  timeline?.destroy();
+  timeline = null;
   clearTimeout(generationTimer);
   generationTimer = null;
   currentPage = Object.hasOwn(pageInfo, page) ? page : 'detail';
-  selectedLocal = null;
   modalHost.replaceChildren();
   screen.classList.toggle('detail-theme', currentPage === 'detail');
   pageHost.innerHTML = ({ detail: detailPage, feedback: feedbackPage, generating: generatingPage, result: resultPage })[currentPage]();
@@ -100,44 +108,122 @@ function render(page) {
   document.getElementById('explanation-title').textContent = title;
   document.getElementById('explanation-copy').textContent = copy;
   previewNotice('');
+  if (currentPage === 'feedback') {
+    timeline = new SongTimeline(document.getElementById('timeline'), {
+      duration: songDuration, state: timelineState, getSelection: selectedSuggestion,
+      onRangeChange: updateRange,
+    });
+  }
   if (currentPage === 'generating') {
     generationTimer = setTimeout(() => render('result'), 5000);
   }
 }
 function openEditor(item) {
-  modalReturnFocus = document.activeElement;
+  if (!item || editing || editorHistoryPending) return;
+  timeline?.pause();
+  editing = { id: item.id, trigger: document.activeElement };
   modalHost.innerHTML = `<div class="modal-layer"><section class="edit-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-title"><h2 id="edit-title">修改建议</h2><textarea id="edit-text" aria-label="建议内容"></textarea><div class="dialog-actions"><button class="dialog-cancel" data-close-modal>取消</button><button class="dialog-save" data-close-modal>保存</button></div></section></div>`;
+  pageHost.inert = true;
+  document.querySelector('.preview-navigation').inert = true;
+  history.pushState({ ...history.state, museEditor: true }, '');
   const input = document.getElementById('edit-text');
   input.value = item.text;
   input.focus();
 }
-function closeEditor() {
+function closeEditor({ save = false, popHistory = true } = {}) {
+  if (!editing) return;
+  const previous = editing;
+  const item = findSuggestion(previous.id);
+  if (save && item) {
+    const value = document.getElementById('edit-text').value;
+    item.text = value.trim() ? value : '';
+    if (!item.text) item.checked = false;
+  }
+  editing = null;
   modalHost.replaceChildren();
-  if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
+  pageHost.inert = false;
+  document.querySelector('.preview-navigation').inert = false;
+  if (save) refreshSuggestions();
+  const target = previous.trigger?.isConnected ? previous.trigger : document.querySelector(`[data-edit="${previous.id}"]`);
+  target?.focus();
+  if (popHistory && history.state?.museEditor) {
+    editorHistoryPending = true;
+    history.back();
+  }
 }
-function selectSegment(id) {
-  const item = initialSuggestions.find(x => x.id === id);
-  if (!item) return;
+function refreshSuggestions() {
+  const list = document.querySelector('.suggestions-scroll');
+  if (!list) return;
+  const scroll = list.scrollTop;
+  list.innerHTML = suggestionSections();
+  list.scrollTop = scroll;
+  document.getElementById('regenerate').disabled = checkedSuggestions().length === 0;
+}
+function updateRange(id, start, end) {
+  const item = findSuggestion(id);
+  if (!item || item.type !== 'local') return;
+  item.start = start;
+  item.end = end;
+  const card = document.querySelector(`[data-segment="${id}"]`);
+  if (card) {
+    card.querySelector('.segment-time span').textContent = `${time(start)}–${time(end)}`;
+    card.setAttribute('aria-label', `查看片段 ${time(start)} 至 ${time(end)}`);
+  }
+}
+function selectSegment(id, { autoplay = true } = {}) {
+  const item = findSuggestion(id);
+  if (!item || item.type !== 'local') return;
   selectedLocal = id;
   document.querySelectorAll('[data-segment]').forEach(card => card.classList.toggle('is-selected', card.dataset.segment === id));
-  document.getElementById('timeline').innerHTML = waveform(item);
-  previewNotice('已切换局部片段的选中样式；当前不播放音频。');
+  timeline?.select({ autoplay });
+}
+function addSuggestion(type) {
+  const item = { id: `new-${nextId++}`, type, text: '', checked: false };
+  if (type === 'local') Object.assign(item, { start: 0, end: 5 });
+  suggestions.push(item);
+  refreshSuggestions();
+  if (type === 'local') selectSegment(item.id, { autoplay: false });
+  const button = document.querySelector(`[data-edit="${item.id}"]`);
+  button?.scrollIntoView({ block: 'nearest' });
+  button?.focus({ preventScroll: true });
+}
+function deleteSuggestion(id) {
+  const index = suggestions.findIndex(item => item.id === id);
+  if (index < 0) return;
+  const type = suggestions[index].type;
+  suggestions.splice(index, 1);
+  if (selectedLocal === id) {
+    selectedLocal = null;
+    timeline?.clearSelection();
+  }
+  refreshSuggestions();
+  document.querySelector(`[data-add="${type}"]`)?.focus({ preventScroll: true });
 }
 document.addEventListener('click', event => {
   const button = event.target.closest('button');
   if (button?.disabled) return;
+  if (editing) {
+    if (button?.hasAttribute('data-close-modal')) closeEditor({ save: button.classList.contains('dialog-save') });
+    return;
+  }
+  if (button?.id === 'regenerate') {
+    if (!checkedSuggestions().length) return;
+    lastGenerationRequest = checkedSuggestions().map(item => ({ ...item }));
+    render('generating');
+    return;
+  }
   if (button?.dataset.page) { render(button.dataset.page); return; }
   if (button?.hasAttribute('data-preview-edit')) {
     if (currentPage !== 'feedback') render('feedback');
-    openEditor(initialSuggestions.find(x => x.type === button.dataset.previewEdit));
+    const type = button.dataset.previewEdit;
+    const item = suggestions.find(x => x.type === type);
+    if (item) openEditor(item);
+    else previewNotice('这类建议已全部删除，可以使用列表中的“新增”按钮创建。');
     return;
   }
-  if (button?.dataset.edit) { openEditor(initialSuggestions.find(x => x.id === button.dataset.edit)); return; }
-  if (button?.hasAttribute('data-close-modal')) {
-    closeEditor();
-    previewNotice('当前仅预览弹窗样式，文字修改暂不写回建议。');
-    return;
-  }
+  if (button?.dataset.edit) { openEditor(findSuggestion(button.dataset.edit)); return; }
+  if (button?.dataset.add) { addSuggestion(button.dataset.add); return; }
+  if (button?.dataset.delete) { deleteSuggestion(button.dataset.delete); return; }
   if (button?.hasAttribute('data-audio-preview')) { previewNotice('真实音频将在后续阶段接入，当前展示播放入口。'); return; }
   if (button?.hasAttribute('data-stage-only')) { previewNotice('此处先展示控件样式，完整操作留到后续阶段。'); return; }
   if (event.target.closest('.suggestion-actions')) return;
@@ -146,8 +232,18 @@ document.addEventListener('click', event => {
 });
 document.addEventListener('change', event => {
   if (!event.target.matches('[data-check]')) return;
-  const count = document.querySelectorAll('[data-check]:checked').length;
-  document.getElementById('regenerate').disabled = count === 0;
+  const item = findSuggestion(event.target.dataset.check);
+  if (!item) return;
+  item.checked = Boolean(item.text.trim()) && event.target.checked;
+  document.getElementById('regenerate').disabled = checkedSuggestions().length === 0;
+});
+window.addEventListener('popstate', () => {
+  editorHistoryPending = false;
+  if (editing) closeEditor({ popHistory: false });
+});
+window.addEventListener('pagehide', () => {
+  timeline?.destroy();
+  clearTimeout(generationTimer);
 });
 document.addEventListener('keydown', event => {
   const dialog = modalHost.querySelector('[role="dialog"]');

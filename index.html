@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="Muse AI 生日歌再创作面试作业，第二阶段静态界面预览。">
+  <meta name="description" content="Muse AI 生日歌再创作面试作业，建议编辑与时间轴交互演示。">
   <title>Muse AI · 生日歌再创作</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="timeline.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -29,6 +30,7 @@
     <symbol id="i-restart" viewBox="0 0 24 24"><path d="M20 9a8 8 0 1 0 0 7M20 3v6h-6"/></symbol>
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20S2 14 2 7a5 5 0 0 1 10-1A5 5 0 0 1 22 7c0 7-10 13-10 13Z"/></symbol>
     <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M7 10h6M10 7v6"/></symbol>
+    <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M7 10h6"/></symbol>
     <symbol id="i-signal" viewBox="0 0 24 24"><path d="M3 18v3M8 13v8M13 8v13M18 3v18"/></symbol>
     <symbol id="i-battery" viewBox="0 0 28 24"><rect x="2" y="6" width="21" height="12" rx="3"/><path d="M26 10v4M5 9h15v6H5"/></symbol>
   </svg>
@@ -49,7 +51,7 @@
         <button data-preview-edit="global">全局建议编辑 <svg aria-hidden="true"><use href="#i-edit"/></svg></button>
         <button data-preview-edit="local">局部建议编辑 <svg aria-hidden="true"><use href="#i-edit"/></svg></button>
       </div>
-      <p class="stage-label"><span></span> 第二阶段 · 静态界面</p>
+      <p class="stage-label"><span></span> 第三阶段 · 建议与时间轴交互</p>
     </aside>
 
     <div class="device-column">
@@ -69,8 +71,8 @@
       <p id="explanation-copy">第一版已经生成。用户想为朋友送上专属祝福，却还不知道该怎么改。</p>
       <div class="explanation-rule"></div>
       <h3>当前可预览</h3>
-      <p>切换页面、打开文字弹窗，以及查看局部片段的选中样式。</p>
-      <p class="preview-boundary">评分、建议和生成结果均为演示资料。音频播放、时间轴拖动及完整编辑操作将在后续阶段接入。</p>
+      <p>新增、编辑、删除和勾选建议。选中局部片段后，拖动两端调整范围，拖动顶部游标自由定位；放大后可用下方滑条平移视窗。</p>
+      <p class="preview-boundary">评分、建议、波形和生成结果均为演示资料。播放器当前仅模拟进度，没有声音；真实音频将在第四阶段接入。刷新页面可重置演示。</p>
       <p class="preview-notice" id="preview-notice" role="status"></p>
     </aside>
   </main>
